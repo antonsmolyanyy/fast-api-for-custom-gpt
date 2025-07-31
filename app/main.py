@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Security
 from app.auth import TokenVerifier
+import httpx
 
 import urllib.request
 
@@ -66,3 +67,47 @@ def private_scoped(auth_result: str = Security(auth, scopes=['delete:messages'])
     - The presence of the `delete:messages` scope in the token.
     """
     return auth_result
+
+# Example: Call external API (JSONPlaceholder)
+@app.get("/api/external/users")
+async def get_external_users():
+    """Example: Call external API to get users"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://jsonplaceholder.typicode.com/users")
+        return {
+            "status": "success",
+            "data": response.json(),
+            "source": "External API: JSONPlaceholder"
+        }
+
+# Example: Call external API with authentication
+@app.get("/api/external/weather")
+async def get_weather(auth_result: str = Security(auth)):
+    """Example: Call weather API (requires authentication)"""
+    # You would replace this with your actual weather API
+    async with httpx.AsyncClient() as client:
+        # Example API call (replace with your actual API)
+        response = await client.get("https://api.openweathermap.org/data/2.5/weather?lat=45.540237&lon=13.731839&appid=6b0bb55a1a72b6fefb0b5abc1e72ced4")
+        return {
+            "status": "success",
+            "user": auth_result,
+            "weather_data": response.json(),
+            "source": "External API: OpenWeatherMap"
+        }
+
+# Example: Call your own custom API
+@app.get("/api/custom/{endpoint}")
+async def call_custom_api(endpoint: str, auth_result: str = Security(auth)):
+    """Example: Call your custom API with dynamic endpoint"""
+    # Replace with your actual API base URL
+    base_url = "https://your-api.com/api"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{base_url}/{endpoint}")
+        return {
+            "status": "success",
+            "user": auth_result,
+            "endpoint": endpoint,
+            "data": response.json(),
+            "source": f"Custom API: {base_url}"
+        }
