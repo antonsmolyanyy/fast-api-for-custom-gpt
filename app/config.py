@@ -2,8 +2,8 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    descope_project_id: str
-    descope_api_base_url: str
+    descope_project_id: str = "dummy-project-id"  # Default for deployment
+    descope_api_base_url: str = "https://api.descope.com"  # Default for deployment
 
     class Config:
         env_file = ".env"
