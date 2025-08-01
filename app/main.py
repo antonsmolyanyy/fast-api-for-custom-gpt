@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Security
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Security, HTTPException, Request, Form
+from fastapi.responses import RedirectResponse
 from app.auth import TokenVerifier
 import httpx
+from typing import Optional
 
 import urllib.request
 
@@ -15,68 +16,90 @@ urllib.request.install_opener(opener)
 app = FastAPI()
 auth = TokenVerifier()
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 def root():
-    """Root endpoint with simple HTML frontend"""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>FastAPI Sample App</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-            .endpoint { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
-            .public { border-left: 4px solid #28a745; }
-            .private { border-left: 4px solid #007bff; }
-            .scoped { border-left: 4px solid #ffc107; }
-            .external { border-left: 4px solid #17a2b8; }
-            a { color: #007bff; text-decoration: none; }
-            a:hover { text-decoration: underline; }
-        </style>
-    </head>
-    <body>
-        <h1>🚀 FastAPI Sample App with Descope Authentication</h1>
-        <p>This is a sample API demonstrating authentication and authorization with Descope.</p>
-        
-        <h2>📋 Available Endpoints</h2>
-        
-        <div class="endpoint public">
-            <h3>🌐 Public Endpoints (No Auth Required)</h3>
-            <ul>
-                <li><a href="/api/public" target="_blank">/api/public</a> - Public endpoint</li>
-                <li><a href="/api/external/users" target="_blank">/api/external/users</a> - External API call</li>
-            </ul>
-        </div>
-        
-        <div class="endpoint private">
-            <h3>🔐 Private Endpoints (Auth Required)</h3>
-            <ul>
-                <li><a href="/api/private" target="_blank">/api/private</a> - Requires valid JWT</li>
-                <li><a href="/api/external/weather" target="_blank">/api/external/weather</a> - Weather API with auth</li>
-            </ul>
-        </div>
-        
-        <div class="endpoint scoped">
-            <h3>🎯 Scoped Endpoints (Auth + Specific Permissions)</h3>
-            <ul>
-                <li><a href="/api/private-scoped/readonly" target="_blank">/api/private-scoped/readonly</a> - Requires 'read:messages' scope</li>
-                <li><a href="/api/private-scoped/write" target="_blank">/api/private-scoped/write</a> - Requires 'read:messages' and 'write:messages' scopes</li>
-                <li><a href="/api/private-scoped/delete" target="_blank">/api/private-scoped/delete</a> - Requires 'delete:messages' scope</li>
-            </ul>
-        </div>
-        
-        <div class="endpoint external">
-            <h3>📚 Documentation</h3>
-            <ul>
-                <li><a href="/docs" target="_blank">/docs</a> - Interactive API documentation</li>
-                <li><a href="/redoc" target="_blank">/redoc</a> - Alternative API documentation</li>
-            </ul>
-        </div>
-        
-        <p><strong>Note:</strong> Private and scoped endpoints require a valid JWT access token in the Authorization header.</p>
-    </body>
-    </html>
+    """Root endpoint - API information"""
+    return {
+        "message": "FastAPI Sample App with Descope Authentication",
+        "version": "1.0.0",
+        "endpoints": {
+            "public": "/api/public",
+            "private": "/api/private",
+            "scoped_readonly": "/api/private-scoped/readonly",
+            "scoped_write": "/api/private-scoped/write", 
+            "scoped_delete": "/api/private-scoped/delete",
+            "external_users": "/api/external/users",
+            "external_weather": "/api/external/weather",
+            "custom_api": "/api/custom/{endpoint}"
+        },
+        "oauth_endpoints": {
+            "authorize": "/authorize",
+            "token": "/token"
+        },
+        "docs": "/docs",
+        "redoc": "/redoc"
+    }
+
+@app.get("/authorize")
+async def authorize(
+    response_type: str,
+    client_id: str,
+    redirect_uri: str,
+    scope: Optional[str] = None,
+    state: Optional[str] = None
+):
     """
+    OAuth 2.0 Authorization Endpoint - Proxies to Descope
+    
+    This endpoint forwards OAuth authorization requests to Descope's Inbound Apps.
+    """
+    # Build the Descope authorization URL
+    descope_url = "https://api.descope.com/oauth2/v1/apps/authorize"
+    
+    # Construct query parameters
+    params = {
+        "response_type": response_type,
+        "client_id": client_id,
+        "redirect_uri": redirect_uri
+    }
+    
+    if scope:
+        params["scope"] = scope
+    if state:
+        params["state"] = state
+    
+    # Build the full URL with query parameters
+    query_string = "&".join([f"{k}={v}" for k, v in params.items()])
+    full_url = f"{descope_url}?{query_string}"
+    
+    # Redirect to Descope's authorization endpoint
+    return RedirectResponse(url=full_url)
+
+@app.post("/token")
+async def token(
+    request: Request
+):
+    """
+    OAuth 2.0 Token Endpoint - Proxies to Descope
+    
+    This endpoint forwards token exchange requests to Descope's Inbound Apps.
+    """
+    # Get the form data from the request
+    form_data = await request.form()
+    
+    # Forward the request to Descope's token endpoint
+    descope_url = "https://api.descope.com/oauth2/v1/apps/token"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            descope_url,
+            data=dict(form_data),
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        
+        # Return the response from Descope
+        return response.json()
+
 
 @app.get("/api/public")
 def public():
