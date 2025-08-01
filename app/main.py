@@ -110,7 +110,7 @@ async def authorize(
             status_code=500,
             detail={
                 "error": "server_error",
-                "error_description": "Internal server error"
+                "error_description": f"Internal server error + {descope_client_id}"
             }
         )
 
