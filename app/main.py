@@ -61,7 +61,7 @@ async def authorize(
                 status_code=400,
                 detail={
                     "error": "invalid_request",
-                    "error_description": "Missing required parameters"
+                    "error_description": f"Missing required parameters + {bool(client_id)} + {bool(redirect_uri)} + {bool(response_type)}"
                 }
             )
 
@@ -152,7 +152,7 @@ async def token(
                 status_code=400,
                 detail={
                     "error": "invalid_request",
-                    "error_description": "Missing required parameters"
+                    "error_description": f"Missing required parameters + {bool(grant_type)} + {bool(code)} + {bool(client_id)} + {bool(client_secret)}"
                 }
             )
 
