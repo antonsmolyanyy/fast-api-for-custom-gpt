@@ -44,7 +44,6 @@ def root():
 @app.get("/authorize")
 async def authorize(
     response_type: Optional[str] = None,
-    client_id: Optional[str] = None,
     redirect_uri: Optional[str] = None,
     scope: Optional[str] = None,
     state: Optional[str] = None
@@ -56,12 +55,12 @@ async def authorize(
     """
     try:
         # Validate required parameters
-        if not client_id or not redirect_uri or not response_type:
+        if not redirect_uri or not response_type:
             raise HTTPException(
                 status_code=400,
                 detail={
                     "error": "invalid_request",
-                    "error_description": f"Missing required parameters + {bool(client_id)} + {bool(redirect_uri)} + {bool(response_type)}"
+                    "error_description": f"Missing required parameters + {bool(redirect_uri)} + {bool(response_type)}"
                 }
             )
 
