@@ -29,12 +29,11 @@ info:
 servers:
   - url: https://fast-api-for-custom-gpt.vercel.app
     description: Production server
-  - url: http://localhost:8000
-    description: Development server
 
 paths:
   /:
     get:
+      operationId: getApiInfo
       summary: Root endpoint
       description: Returns API information and available endpoints
       responses:
@@ -96,6 +95,7 @@ paths:
 
   /authorize:
     get:
+      operationId: authorizeOAuth
       summary: OAuth 2.0 Authorization Endpoint
       description: |
         Proxies OAuth authorization requests to Descope's Inbound Apps.
@@ -145,6 +145,7 @@ paths:
 
   /token:
     post:
+      operationId: exchangeToken
       summary: OAuth 2.0 Token Endpoint
       description: |
         Proxies token exchange requests to Descope's Inbound Apps.
@@ -206,6 +207,7 @@ paths:
 
   /api/public:
     get:
+      operationId: getPublicEndpoint
       summary: Public endpoint
       description: Public endpoint that requires no authentication
       responses:
@@ -225,6 +227,7 @@ paths:
 
   /api/private:
     get:
+      operationId: getPrivateEndpoint
       summary: Private endpoint
       description: Protected endpoint that requires valid JWT authentication
       security:
@@ -237,6 +240,27 @@ paths:
               schema:
                 type: object
                 description: JWT payload from the authenticated user
+                properties:
+                  sub:
+                    type: string
+                    description: Subject identifier from JWT
+                    example: "user123"
+                  email:
+                    type: string
+                    description: User email from JWT
+                    example: "user@example.com"
+                  scope:
+                    type: string
+                    description: Granted scopes from JWT
+                    example: "read:messages write:messages"
+                  iat:
+                    type: integer
+                    description: Token issued at timestamp
+                    example: 1234567890
+                  exp:
+                    type: integer
+                    description: Token expiration timestamp
+                    example: 1234567890
         '401':
           description: Unauthorized - invalid or missing token
         '403':
@@ -244,6 +268,7 @@ paths:
 
   /api/private-scoped/readonly:
     get:
+      operationId: getReadOnlyScopedEndpoint
       summary: Read-only scoped endpoint
       description: Protected endpoint that requires 'read:messages' scope
       security:
@@ -256,6 +281,27 @@ paths:
               schema:
                 type: object
                 description: JWT payload from the authenticated user
+                properties:
+                  sub:
+                    type: string
+                    description: Subject identifier from JWT
+                    example: "user123"
+                  email:
+                    type: string
+                    description: User email from JWT
+                    example: "user@example.com"
+                  scope:
+                    type: string
+                    description: Granted scopes from JWT
+                    example: "read:messages write:messages"
+                  iat:
+                    type: integer
+                    description: Token issued at timestamp
+                    example: 1234567890
+                  exp:
+                    type: integer
+                    description: Token expiration timestamp
+                    example: 1234567890
         '401':
           description: Unauthorized - invalid or missing token
         '403':
@@ -263,6 +309,7 @@ paths:
 
   /api/private-scoped/write:
     get:
+      operationId: getWriteScopedEndpoint
       summary: Write scoped endpoint
       description: Protected endpoint that requires 'read:messages' and 'write:messages' scopes
       security:
@@ -275,6 +322,27 @@ paths:
               schema:
                 type: object
                 description: JWT payload from the authenticated user
+                properties:
+                  sub:
+                    type: string
+                    description: Subject identifier from JWT
+                    example: "user123"
+                  email:
+                    type: string
+                    description: User email from JWT
+                    example: "user@example.com"
+                  scope:
+                    type: string
+                    description: Granted scopes from JWT
+                    example: "read:messages write:messages"
+                  iat:
+                    type: integer
+                    description: Token issued at timestamp
+                    example: 1234567890
+                  exp:
+                    type: integer
+                    description: Token expiration timestamp
+                    example: 1234567890
         '401':
           description: Unauthorized - invalid or missing token
         '403':
@@ -282,6 +350,7 @@ paths:
 
   /api/private-scoped/delete:
     get:
+      operationId: getDeleteScopedEndpoint
       summary: Delete scoped endpoint
       description: Protected endpoint that requires 'delete:messages' scope
       security:
@@ -294,6 +363,27 @@ paths:
               schema:
                 type: object
                 description: JWT payload from the authenticated user
+                properties:
+                  sub:
+                    type: string
+                    description: Subject identifier from JWT
+                    example: "user123"
+                  email:
+                    type: string
+                    description: User email from JWT
+                    example: "user@example.com"
+                  scope:
+                    type: string
+                    description: Granted scopes from JWT
+                    example: "read:messages write:messages"
+                  iat:
+                    type: integer
+                    description: Token issued at timestamp
+                    example: 1234567890
+                  exp:
+                    type: integer
+                    description: Token expiration timestamp
+                    example: 1234567890
         '401':
           description: Unauthorized - invalid or missing token
         '403':
@@ -301,6 +391,7 @@ paths:
 
   /api/external/users:
     get:
+      operationId: getExternalUsers
       summary: External users API
       description: Calls external API to get users (no authentication required)
       responses:
@@ -331,6 +422,7 @@ paths:
 
   /api/external/weather:
     get:
+      operationId: getExternalWeather
       summary: External weather API
       description: Calls external weather API (requires authentication)
       security:
@@ -360,6 +452,7 @@ paths:
 
   /api/custom/{endpoint}:
     get:
+      operationId: getCustomApiEndpoint
       summary: Custom API endpoint
       description: Calls your custom API with dynamic endpoint (requires authentication)
       security:

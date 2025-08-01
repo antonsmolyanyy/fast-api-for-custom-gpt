@@ -2,8 +2,9 @@ from fastapi import FastAPI, Security, HTTPException, Request, Form
 from fastapi.responses import RedirectResponse
 from app.auth import TokenVerifier
 import httpx
+import json
 from typing import Optional
-
+from app.config import get_settings
 import urllib.request
 
 # We use PyJWKClient, which internally uses Python's built-in urllib.request, which sends requests
@@ -42,9 +43,9 @@ def root():
 
 @app.get("/authorize")
 async def authorize(
-    response_type: str,
-    client_id: str,
-    redirect_uri: str,
+    response_type: Optional[str] = None,
+    client_id: Optional[str] = None,
+    redirect_uri: Optional[str] = None,
     scope: Optional[str] = None,
     state: Optional[str] = None
 ):
@@ -53,27 +54,66 @@ async def authorize(
     
     This endpoint forwards OAuth authorization requests to Descope's Inbound Apps.
     """
-    # Build the Descope authorization URL
-    descope_url = "https://api.descope.com/oauth2/v1/apps/authorize"
-    
-    # Construct query parameters
-    params = {
-        "response_type": response_type,
-        "client_id": client_id,
-        "redirect_uri": redirect_uri
-    }
-    
-    if scope:
-        params["scope"] = scope
-    if state:
-        params["state"] = state
-    
-    # Build the full URL with query parameters
-    query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-    full_url = f"{descope_url}?{query_string}"
-    
-    # Redirect to Descope's authorization endpoint
-    return RedirectResponse(url=full_url)
+    try:
+        # Validate required parameters
+        if not client_id or not redirect_uri or not response_type:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_request",
+                    "error_description": "Missing required parameters"
+                }
+            )
+
+        # Validate response_type
+        if response_type != "code":
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "unsupported_response_type",
+                    "error_description": 'Only "code" is supported'
+                }
+            )
+
+        # Store the original redirect_uri in the state for the callback
+        state_with_redirect = {
+            "state": state or "",
+            "redirect_uri": redirect_uri
+        }
+
+        # Build Descope authorization URL
+        descope_url = "https://api.descope.com/oauth2/v1/apps/authorize"
+        
+        # Get client ID from environment or use the provided one
+        descope_client_id = get_settings().descope_inbound_app_client_id
+        
+        # Construct query parameters
+        params = {
+            "client_id": descope_client_id,
+            "redirect_uri": "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback",  # Use our callback endpoint
+            "response_type": "code",
+            "scope": scope or "openid",
+            "state": json.dumps(state_with_redirect)
+        }
+        
+        # Build the full URL with query parameters
+        query_string = "&".join([f"{k}={v}" for k, v in params.items()])
+        full_url = f"{descope_url}?{query_string}"
+        
+        # Redirect to Descope's authorization endpoint
+        return RedirectResponse(url=full_url)
+        
+    except HTTPException:
+        raise
+    except Exception as error:
+        print(f"Authorization endpoint error: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "server_error",
+                "error_description": "Internal server error"
+            }
+        )
 
 @app.post("/token")
 async def token(
@@ -84,21 +124,173 @@ async def token(
     
     This endpoint forwards token exchange requests to Descope's Inbound Apps.
     """
-    # Get the form data from the request
-    form_data = await request.form()
-    
-    # Forward the request to Descope's token endpoint
-    descope_url = "https://api.descope.com/oauth2/v1/apps/token"
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            descope_url,
-            data=dict(form_data),
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
+    try:
+        # Parse the request body based on content type
+        content_type = request.headers.get("content-type", "")
         
-        # Return the response from Descope
-        return response.json()
+        if "application/json" in content_type:
+            body = await request.json()
+        elif "application/x-www-form-urlencoded" in content_type:
+            form_data = await request.form()
+            body = dict(form_data)
+        else:
+            # Try to parse as JSON first, then as form data
+            try:
+                body = await request.json()
+            except:
+                form_data = await request.form()
+                body = dict(form_data)
+        
+        grant_type = body.get("grant_type")
+        code = body.get("code")
+        client_id = body.get("client_id")
+        client_secret = body.get("client_secret")
+
+        # Validate required parameters
+        if not grant_type or not code or not client_id or not client_secret:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_request",
+                    "error_description": "Missing required parameters"
+                }
+            )
+
+        # Only support authorization_code grant type
+        if grant_type != "authorization_code":
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "unsupported_grant_type",
+                    "error_description": "Only authorization_code is supported"
+                }
+            )
+
+        # Check if we have the required environment variables
+        config = get_settings()
+        if not config.descope_inbound_app_client_id or not config.descope_inbound_app_client_secret:
+            print("Missing environment variables for token exchange")
+            print(f"CLIENT_ID: {bool(config.descope_inbound_app_client_id)}")
+            print(f"CLIENT_SECRET: {bool(config.descope_inbound_app_client_secret)}")
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "server_error",
+                    "error_description": "OAuth configuration incomplete"
+                }
+            )
+
+        # Forward the request to Descope's token endpoint
+        token_request_body = {
+            "grant_type": "authorization_code",
+            "client_id": config.descope_inbound_app_client_id,
+            "client_secret": config.descope_inbound_app_client_secret,
+            "code": code,
+            "redirect_uri": "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback"  # Must match authorize endpoint
+        }
+
+        print(f"Token exchange request body: {token_request_body}")
+        print(f"Token exchange URL: https://api.descope.com/oauth2/v1/apps/token")
+
+        descope_url = "https://api.descope.com/oauth2/v1/apps/token"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                descope_url,
+                data=token_request_body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+            
+            descope_data = response.json()
+            
+            # Log the response for debugging
+            print(f"Descope token response status: {response.status_code}")
+            print(f"Descope token response data: {descope_data}")
+
+            # If Descope returned an error, log it
+            if response.status_code >= 400:
+                print(f"Descope token exchange failed: {descope_data}")
+
+            # Return the response from Descope
+            return descope_data
+            
+    except HTTPException:
+        raise
+    except Exception as error:
+        print(f"Token endpoint error: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "server_error",
+                "error_description": "Internal server error"
+            }
+        )
+
+@app.get("/api/oauth/callback")
+async def oauth_callback(
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None
+):
+    """
+    OAuth 2.0 Callback Endpoint
+    
+    Handles the callback from Descope and redirects back to Custom GPT.
+    """
+    try:
+        # Handle errors from Descope
+        if error:
+            print(f"Descope authorization error: {error}, {error_description}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": error,
+                    "error_description": error_description
+                }
+            )
+
+        if not code:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_request",
+                    "error_description": "No authorization code received"
+                }
+            )
+
+        # Parse the state to get the original redirect_uri
+        original_redirect_uri = "https://chat.openai.com/oauth/callback"  # fallback
+        original_state = ""
+        
+        if state:
+            try:
+                state_data = json.loads(state)
+                original_redirect_uri = state_data.get("redirect_uri", "https://chat.openai.com/oauth/callback")
+                original_state = state_data.get("state", "")
+            except Exception as parse_error:
+                print(f"Failed to parse state: {parse_error}")
+                original_redirect_uri = "https://chat.openai.com/oauth/callback"
+                original_state = state
+
+        # Build redirect URL back to Custom GPT
+        redirect_url = f"{original_redirect_uri}?code={code}"
+        if original_state:
+            redirect_url += f"&state={original_state}"
+
+        return RedirectResponse(url=redirect_url)
+        
+    except HTTPException:
+        raise
+    except Exception as error:
+        print(f"Callback endpoint error: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "server_error",
+                "error_description": "Internal server error"
+            }
+        )
 
 
 @app.get("/api/public")
