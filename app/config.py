@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     descope_project_id: str = "dummy-project-id"  # Default for deployment
     descope_api_base_url: str = "https://api.descope.com"  # Default for deployment
+    descope_inbound_app_client_id: str = "dummy-client-id"  # Default for deployment
+    descope_inbound_app_client_secret: str = "dummy-client-secret"  # Default for deployment
 
     class Config:
         env_file = ".env"
