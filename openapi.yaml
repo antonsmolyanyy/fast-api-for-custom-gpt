@@ -1,0 +1,457 @@
+openapi: 3.1.0
+info:
+  title: FastAPI Sample App with Descope Authentication
+  description: |
+    A FastAPI application demonstrating authentication and authorization with Descope.
+    This API supports both direct JWT authentication and OAuth 2.0 flow for Custom GPT integration.
+    
+    ## Authentication
+    - **Public endpoints**: No authentication required
+    - **Private endpoints**: Require valid JWT token in Authorization header
+    - **Scoped endpoints**: Require specific scopes in addition to authentication
+    
+    ## OAuth 2.0 Flow
+    - **Authorization**: `/authorize` (proxies to Descope)
+    - **Token**: `/token` (proxies to Descope)
+    
+    ## Scopes
+    - `read:messages` - Read access to messages
+    - `write:messages` - Write access to messages  
+    - `delete:messages` - Delete access to messages
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://fast-api-for-custom-gpt.vercel.app
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+paths:
+  /:
+    get:
+      summary: Root endpoint
+      description: Returns API information and available endpoints
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FastAPI Sample App with Descope Authentication"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  endpoints:
+                    type: object
+                    properties:
+                      public:
+                        type: string
+                        example: "/api/public"
+                      private:
+                        type: string
+                        example: "/api/private"
+                      scoped_readonly:
+                        type: string
+                        example: "/api/private-scoped/readonly"
+                      scoped_write:
+                        type: string
+                        example: "/api/private-scoped/write"
+                      scoped_delete:
+                        type: string
+                        example: "/api/private-scoped/delete"
+                      external_users:
+                        type: string
+                        example: "/api/external/users"
+                      external_weather:
+                        type: string
+                        example: "/api/external/weather"
+                      custom_api:
+                        type: string
+                        example: "/api/custom/{endpoint}"
+                  oauth_endpoints:
+                    type: object
+                    properties:
+                      authorize:
+                        type: string
+                        example: "/authorize"
+                      token:
+                        type: string
+                        example: "/token"
+                  docs:
+                    type: string
+                    example: "/docs"
+                  redoc:
+                    type: string
+                    example: "/redoc"
+
+  /authorize:
+    get:
+      summary: OAuth 2.0 Authorization Endpoint
+      description: |
+        Proxies OAuth authorization requests to Descope's Inbound Apps.
+        This endpoint forwards the request to Descope's authorization endpoint.
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [code]
+          description: Must be 'code' for authorization code flow
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Your Descope Inbound App client ID
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Where to redirect after authorization
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Requested scopes (e.g., "read:messages write:messages")
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+          description: CSRF protection state parameter
+      responses:
+        '302':
+          description: Redirects to Descope's authorization endpoint
+          headers:
+            Location:
+              description: URL to Descope's authorization endpoint
+              schema:
+                type: string
+        '400':
+          description: Bad request - invalid parameters
+
+  /token:
+    post:
+      summary: OAuth 2.0 Token Endpoint
+      description: |
+        Proxies token exchange requests to Descope's Inbound Apps.
+        This endpoint forwards the request to Descope's token endpoint.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - grant_type
+                - code
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code]
+                  description: Must be 'authorization_code'
+                code:
+                  type: string
+                  description: Authorization code from /authorize endpoint
+                client_id:
+                  type: string
+                  description: Your Descope Inbound App client ID
+                client_secret:
+                  type: string
+                  description: Your Descope Inbound App client secret
+                redirect_uri:
+                  type: string
+                  description: Must match the one used in /authorize
+      responses:
+        '200':
+          description: Token response from Descope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: JWT access token
+                  token_type:
+                    type: string
+                    example: "Bearer"
+                  expires_in:
+                    type: integer
+                    description: Token expiration time in seconds
+                  scope:
+                    type: string
+                    description: Granted scopes
+                  refresh_token:
+                    type: string
+                    description: Refresh token (if applicable)
+                  id_token:
+                    type: string
+                    description: ID token (for OpenID Connect)
+        '400':
+          description: Bad request - invalid parameters or expired code
+
+  /api/public:
+    get:
+      summary: Public endpoint
+      description: Public endpoint that requires no authentication
+      responses:
+        '200':
+          description: Success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  msg:
+                    type: string
+                    example: "Success! This endpoint is publicly available and requires no authentication."
+
+  /api/private:
+    get:
+      summary: Private endpoint
+      description: Protected endpoint that requires valid JWT authentication
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success response with user data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: JWT payload from the authenticated user
+        '401':
+          description: Unauthorized - invalid or missing token
+        '403':
+          description: Forbidden - insufficient permissions
+
+  /api/private-scoped/readonly:
+    get:
+      summary: Read-only scoped endpoint
+      description: Protected endpoint that requires 'read:messages' scope
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success response with user data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: JWT payload from the authenticated user
+        '401':
+          description: Unauthorized - invalid or missing token
+        '403':
+          description: Forbidden - missing 'read:messages' scope
+
+  /api/private-scoped/write:
+    get:
+      summary: Write scoped endpoint
+      description: Protected endpoint that requires 'read:messages' and 'write:messages' scopes
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success response with user data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: JWT payload from the authenticated user
+        '401':
+          description: Unauthorized - invalid or missing token
+        '403':
+          description: Forbidden - missing required scopes
+
+  /api/private-scoped/delete:
+    get:
+      summary: Delete scoped endpoint
+      description: Protected endpoint that requires 'delete:messages' scope
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success response with user data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: JWT payload from the authenticated user
+        '401':
+          description: Unauthorized - invalid or missing token
+        '403':
+          description: Forbidden - missing 'delete:messages' scope
+
+  /api/external/users:
+    get:
+      summary: External users API
+      description: Calls external API to get users (no authentication required)
+      responses:
+        '200':
+          description: Success response with external user data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                  source:
+                    type: string
+                    example: "External API: JSONPlaceholder"
+
+  /api/external/weather:
+    get:
+      summary: External weather API
+      description: Calls external weather API (requires authentication)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success response with weather data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  user:
+                    type: object
+                    description: JWT payload from the authenticated user
+                  weather_data:
+                    type: object
+                    description: Weather data from external API
+                  source:
+                    type: string
+                    example: "External API: OpenWeatherMap"
+        '401':
+          description: Unauthorized - invalid or missing token
+
+  /api/custom/{endpoint}:
+    get:
+      summary: Custom API endpoint
+      description: Calls your custom API with dynamic endpoint (requires authentication)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: endpoint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The endpoint to call on your custom API
+      responses:
+        '200':
+          description: Success response with custom API data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  user:
+                    type: object
+                    description: JWT payload from the authenticated user
+                  endpoint:
+                    type: string
+                    description: The endpoint that was called
+                  data:
+                    type: object
+                    description: Response data from custom API
+                  source:
+                    type: string
+                    example: "Custom API: https://your-api.com/api"
+        '401':
+          description: Unauthorized - invalid or missing token
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token from Descope authentication.
+        Can be obtained via direct login or OAuth 2.0 flow.
+        Include the token in the Authorization header as "Bearer <token>".
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message
+        status_code:
+          type: integer
+          description: HTTP status code
+
+    UnauthenticatedError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            detail:
+              type: string
+              example: "Not authenticated"
+            status_code:
+              type: integer
+              example: 401
+
+    UnauthorizedError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            detail:
+              type: string
+              example: "Insufficient permissions"
+            status_code:
+              type: integer
+              example: 403
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: OAuth
+    description: OAuth 2.0 endpoints for Custom GPT integration
+  - name: Public
+    description: Public endpoints that require no authentication
+  - name: Private
+    description: Private endpoints that require authentication
+  - name: External
+    description: External API integration endpoints 
