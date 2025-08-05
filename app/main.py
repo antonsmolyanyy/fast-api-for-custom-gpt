@@ -13,6 +13,7 @@ import urllib.request
 opener = urllib.request.build_opener()
 opener.addheaders = [('User-agent', 'Mozilla/5.0 (DescopeFastAPISampleApp)')]
 urllib.request.install_opener(opener)
+config = get_settings()
 
 app = FastAPI()
 auth = TokenVerifier()
@@ -26,9 +27,10 @@ def root():
         "endpoints": {
             "public": "/api/public",
             "private": "/api/private",
-            "scoped_readonly": "/api/private-scoped/readonly",
-            "scoped_write": "/api/private-scoped/write", 
-            "scoped_delete": "/api/private-scoped/delete",
+            "scoped_usage_read": "/api/private-scoped/usage/read",
+            "scoped_logs_read": "/api/private-scoped/logs/read",
+            "scoped_ci_trigger": "/api/private-scoped/ci/trigger",
+            "scoped_ci_read": "/api/private-scoped/ci/read",
             "external_users": "/api/external/users",
             "external_weather": "/api/external/weather",
             "custom_api": "/api/custom/{endpoint}"
@@ -74,12 +76,6 @@ async def authorize(
                 }
             )
 
-        # Store the original redirect_uri in the state for the callback
-        state_with_redirect = {
-            "state": state or "",
-            "redirect_uri": redirect_uri
-        }
-
         # Build Descope authorization URL
         descope_url = "https://api.descope.com/oauth2/v1/apps/authorize"
         
@@ -89,15 +85,15 @@ async def authorize(
         # Construct query parameters
         params = {
             "client_id": descope_client_id,
-            "redirect_uri": "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback",  # Use our callback endpoint
+            "redirect_uri": "https://249d6a6783af.ngrok-free.app/api/oauth/callback",  # Your actual ngrok URL
             "response_type": "code",
             "scope": scope or "openid",
-            "state": json.dumps(state_with_redirect)
+            "state": state or ""  # Just pass through the state parameter
         }
         
         # Build the full URL with query parameters
         query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-        full_url = f"{descope_url}?{query_string}"
+        full_url = f"https://api.descope.com/oauth2/v1/apps/authorize?{query_string}"
         
         # Redirect to Descope's authorization endpoint
         return RedirectResponse(url=full_url)
@@ -142,8 +138,8 @@ async def token(
         
         grant_type = body.get("grant_type")
         code = body.get("code")
-        client_id = body.get("client_id")
-        client_secret = body.get("client_secret")
+        client_id = config.descope_inbound_app_client_id
+        client_secret = config.descope_inbound_app_client_secret
 
         # Validate required parameters
         if not grant_type or not code or not client_id or not client_secret:
@@ -166,7 +162,6 @@ async def token(
             )
 
         # Check if we have the required environment variables
-        config = get_settings()
         if not config.descope_inbound_app_client_id or not config.descope_inbound_app_client_secret:
             print("Missing environment variables for token exchange")
             print(f"CLIENT_ID: {bool(config.descope_inbound_app_client_id)}")
@@ -185,7 +180,7 @@ async def token(
             "client_id": config.descope_inbound_app_client_id,
             "client_secret": config.descope_inbound_app_client_secret,
             "code": code,
-            "redirect_uri": "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback"  # Must match authorize endpoint
+            "redirect_uri": "https://249d6a6783af.ngrok-free.app/api/oauth/callback"  # Your actual ngrok URL
         }
 
         print(f"Token exchange request body: {token_request_body}")
@@ -258,24 +253,15 @@ async def oauth_callback(
                 }
             )
 
-        # Parse the state to get the original redirect_uri
-        original_redirect_uri = "https://chat.openai.com/oauth/callback"  # fallback
-        original_state = ""
+        # Custom GPT callback URL
+        custom_gpt_callback = "https://chat.openai.com/aip/g-e3b7f2f4c25562eb30538a4f1aa74846326222f6/oauth/callback"
         
-        if state:
-            try:
-                state_data = json.loads(state)
-                original_redirect_uri = state_data.get("redirect_uri", "https://chat.openai.com/oauth/callback")
-                original_state = state_data.get("state", "")
-            except Exception as parse_error:
-                print(f"Failed to parse state: {parse_error}")
-                original_redirect_uri = "https://chat.openai.com/oauth/callback"
-                original_state = state
-
         # Build redirect URL back to Custom GPT
-        redirect_url = f"{original_redirect_uri}?code={code}"
-        if original_state:
-            redirect_url += f"&state={original_state}"
+        redirect_url = f"{custom_gpt_callback}?code={code}"
+        if state:
+            redirect_url += f"&state={state}"
+        
+        print(f"Redirecting to: {redirect_url}")
 
         return RedirectResponse(url=redirect_url)
         
@@ -313,36 +299,58 @@ def private(auth_result: str = Security(auth)):
     return auth_result
 
 
-@app.get("/api/private-scoped/readonly")
-def private_scoped(auth_result: str = Security(auth, scopes=['read:messages'])):
+@app.get("/api/private-scoped/usage/read")
+def private_scoped(auth_result: str = Security(auth, scopes=['usage:read'])):
     """
     This is a protected route with scope-based access control.
 
     Access to this endpoint requires:
     - A valid access token (authentication), and
-    - The presence of the `read:messages` scope in the token.
+    - The presence of the `usage:read` scope in the token.
     """
     return auth_result
 
-@app.get("/api/private-scoped/write")
-def private_scoped(auth_result: str = Security(auth, scopes=['read:messages', 'write:messages'])):
+@app.get("/api/private-scoped/logs/read")
+def private_scoped(auth_result: str = Security(auth, scopes=['logs:read'])):
     """
     This is a protected route with scope-based access control.
 
     Access to this endpoint requires:
     - A valid access token (authentication), and
-    - The presence of the `read:messages` and `write:messages` scope in the token.
+    - The presence of the `logs:read` scope in the token.
     """
     return auth_result
 
-@app.get("/api/private-scoped/delete")
-def private_scoped(auth_result: str = Security(auth, scopes=['delete:messages'])):
+@app.get("/api/private-scoped/ci/trigger")
+def private_scoped(auth_result: str = Security(auth, scopes=['ci:trigger'])):
     """
     This is a protected route with scope-based access control.
 
     Access to this endpoint requires:
     - A valid access token (authentication), and
-    - The presence of the `delete:messages` scope in the token.
+    - The presence of the `ci:trigger` scope in the token.
+    """
+    return auth_result
+
+@app.get("/api/private-scoped/ci/read")
+def private_scoped(auth_result: str = Security(auth, scopes=['ci:read'])):
+    """
+    This is a protected route with scope-based access control.
+
+    Access to this endpoint requires:
+    - A valid access token (authentication), and
+    - The presence of the `ci:read` scope in the token.
+    """
+    return auth_result
+
+@app.get("/api/private-scoped/deploy/rollback")
+def private_scoped(auth_result: str = Security(auth, scopes=['deploy:rollback'])):
+    """
+    This is a protected route with scope-based access control.
+
+    Access to this endpoint requires:
+    - A valid access token (authentication), and
+    - The presence of the `deploy:rollback` scope in the token.
     """
     return auth_result
 

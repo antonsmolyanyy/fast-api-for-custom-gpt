@@ -13,11 +13,14 @@ info:
     ## OAuth 2.0 Flow
     - **Authorization**: `/authorize` (proxies to Descope)
     - **Token**: `/token` (proxies to Descope)
+    - **Callback**: `/api/oauth/callback` (handles OAuth callback)
     
     ## Scopes
-    - `read:messages` - Read access to messages
-    - `write:messages` - Write access to messages  
-    - `delete:messages` - Delete access to messages
+    - `usage:read` - Read access to usage data
+    - `logs:read` - Read access to logs
+    - `ci:trigger` - Trigger CI/CD pipelines
+    - `ci:read` - Read access to CI/CD data
+    - `deploy:rollback` - Rollback deployments
   version: 1.0.0
   contact:
     name: API Support
@@ -27,8 +30,8 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://fast-api-for-custom-gpt.vercel.app
-    description: Production server
+  - url: https://249d6a6783af.ngrok-free.app
+    description: Development server (ngrok)
 
 paths:
   /:
@@ -59,15 +62,21 @@ paths:
                       private:
                         type: string
                         example: "/api/private"
-                      scoped_readonly:
+                      scoped_usage_read:
                         type: string
-                        example: "/api/private-scoped/readonly"
-                      scoped_write:
+                        example: "/api/private-scoped/usage/read"
+                      scoped_logs_read:
                         type: string
-                        example: "/api/private-scoped/write"
-                      scoped_delete:
+                        example: "/api/private-scoped/logs/read"
+                      scoped_ci_trigger:
                         type: string
-                        example: "/api/private-scoped/delete"
+                        example: "/api/private-scoped/ci/trigger"
+                      scoped_ci_read:
+                        type: string
+                        example: "/api/private-scoped/ci/read"
+                      scoped_deploy_rollback:
+                        type: string
+                        example: "/api/private-scoped/deploy/rollback"
                       external_users:
                         type: string
                         example: "/api/external/users"
@@ -108,12 +117,6 @@ paths:
             type: string
             enum: [code]
           description: Must be 'code' for authorization code flow
-        - name: client_id
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Your Descope Inbound App client ID
         - name: redirect_uri
           in: query
           required: true
@@ -125,7 +128,7 @@ paths:
           required: false
           schema:
             type: string
-          description: Requested scopes (e.g., "read:messages write:messages")
+          description: Requested scopes (e.g., "usage:read logs:read ci:trigger")
         - name: state
           in: query
           required: false
@@ -205,6 +208,49 @@ paths:
         '400':
           description: Bad request - invalid parameters or expired code
 
+  /api/oauth/callback:
+    get:
+      operationId: oauthCallback
+      summary: OAuth 2.0 Callback Endpoint
+      description: |
+        Handles the callback from Descope and redirects back to Custom GPT.
+        This endpoint receives the authorization code and redirects it to the Custom GPT callback URL.
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Authorization code from Descope
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+          description: State parameter from the authorization request
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Error code from Descope (if any)
+        - name: error_description
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Error description from Descope (if any)
+      responses:
+        '302':
+          description: Redirects to Custom GPT callback URL with authorization code
+          headers:
+            Location:
+              description: URL to Custom GPT callback
+              schema:
+                type: string
+        '400':
+          description: Bad request - missing authorization code or error from Descope
+
   /api/public:
     get:
       operationId: getPublicEndpoint
@@ -252,7 +298,7 @@ paths:
                   scope:
                     type: string
                     description: Granted scopes from JWT
-                    example: "read:messages write:messages"
+                    example: "usage:read logs:read ci:trigger"
                   iat:
                     type: integer
                     description: Token issued at timestamp
@@ -266,11 +312,11 @@ paths:
         '403':
           description: Forbidden - insufficient permissions
 
-  /api/private-scoped/readonly:
+  /api/private-scoped/usage/read:
     get:
-      operationId: getReadOnlyScopedEndpoint
-      summary: Read-only scoped endpoint
-      description: Protected endpoint that requires 'read:messages' scope
+      operationId: getUsageReadEndpoint
+      summary: Usage read endpoint
+      description: Protected endpoint that requires 'usage:read' scope
       security:
         - BearerAuth: []
       responses:
@@ -293,7 +339,7 @@ paths:
                   scope:
                     type: string
                     description: Granted scopes from JWT
-                    example: "read:messages write:messages"
+                    example: "usage:read logs:read ci:trigger"
                   iat:
                     type: integer
                     description: Token issued at timestamp
@@ -305,13 +351,13 @@ paths:
         '401':
           description: Unauthorized - invalid or missing token
         '403':
-          description: Forbidden - missing 'read:messages' scope
+          description: Forbidden - missing 'usage:read' scope
 
-  /api/private-scoped/write:
+  /api/private-scoped/logs/read:
     get:
-      operationId: getWriteScopedEndpoint
-      summary: Write scoped endpoint
-      description: Protected endpoint that requires 'read:messages' and 'write:messages' scopes
+      operationId: getLogsReadEndpoint
+      summary: Logs read endpoint
+      description: Protected endpoint that requires 'logs:read' scope
       security:
         - BearerAuth: []
       responses:
@@ -334,7 +380,7 @@ paths:
                   scope:
                     type: string
                     description: Granted scopes from JWT
-                    example: "read:messages write:messages"
+                    example: "usage:read logs:read ci:trigger"
                   iat:
                     type: integer
                     description: Token issued at timestamp
@@ -346,13 +392,13 @@ paths:
         '401':
           description: Unauthorized - invalid or missing token
         '403':
-          description: Forbidden - missing required scopes
+          description: Forbidden - missing 'logs:read' scope
 
-  /api/private-scoped/delete:
+  /api/private-scoped/ci/trigger:
     get:
-      operationId: getDeleteScopedEndpoint
-      summary: Delete scoped endpoint
-      description: Protected endpoint that requires 'delete:messages' scope
+      operationId: getCiTriggerEndpoint
+      summary: CI trigger endpoint
+      description: Protected endpoint that requires 'ci:trigger' scope
       security:
         - BearerAuth: []
       responses:
@@ -375,7 +421,7 @@ paths:
                   scope:
                     type: string
                     description: Granted scopes from JWT
-                    example: "read:messages write:messages"
+                    example: "usage:read logs:read ci:trigger"
                   iat:
                     type: integer
                     description: Token issued at timestamp
@@ -387,7 +433,89 @@ paths:
         '401':
           description: Unauthorized - invalid or missing token
         '403':
-          description: Forbidden - missing 'delete:messages' scope
+          description: Forbidden - missing 'ci:trigger' scope
+
+  /api/private-scoped/ci/read:
+    get:
+      operationId: getCiReadEndpoint
+      summary: CI read endpoint
+      description: Protected endpoint that requires 'ci:read' scope
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success response with user data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: JWT payload from the authenticated user
+                properties:
+                  sub:
+                    type: string
+                    description: Subject identifier from JWT
+                    example: "user123"
+                  email:
+                    type: string
+                    description: User email from JWT
+                    example: "user@example.com"
+                  scope:
+                    type: string
+                    description: Granted scopes from JWT
+                    example: "usage:read logs:read ci:trigger"
+                  iat:
+                    type: integer
+                    description: Token issued at timestamp
+                    example: 1234567890
+                  exp:
+                    type: integer
+                    description: Token expiration timestamp
+                    example: 1234567890
+        '401':
+          description: Unauthorized - invalid or missing token
+        '403':
+          description: Forbidden - missing 'ci:read' scope
+
+  /api/private-scoped/deploy/rollback:
+    get:
+      operationId: getDeployRollbackEndpoint
+      summary: Deploy rollback endpoint
+      description: Protected endpoint that requires 'deploy:rollback' scope
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success response with user data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: JWT payload from the authenticated user
+                properties:
+                  sub:
+                    type: string
+                    description: Subject identifier from JWT
+                    example: "user123"
+                  email:
+                    type: string
+                    description: User email from JWT
+                    example: "user@example.com"
+                  scope:
+                    type: string
+                    description: Granted scopes from JWT
+                    example: "usage:read logs:read ci:trigger"
+                  iat:
+                    type: integer
+                    description: Token issued at timestamp
+                    example: 1234567890
+                  exp:
+                    type: integer
+                    description: Token expiration timestamp
+                    example: 1234567890
+        '401':
+          description: Unauthorized - invalid or missing token
+        '403':
+          description: Forbidden - missing 'deploy:rollback' scope
 
   /api/external/users:
     get:
