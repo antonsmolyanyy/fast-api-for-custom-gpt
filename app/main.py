@@ -85,7 +85,7 @@ async def authorize(
         # Construct query parameters
         params = {
             "client_id": descope_client_id,
-            "redirect_uri": "https://249d6a6783af.ngrok-free.app/api/oauth/callback",  # Your actual ngrok URL
+            "redirect_uri": "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback",  # Your actual ngrok URL
             "response_type": "code",
             "scope": scope or "openid",
             "state": state or ""  # Just pass through the state parameter
@@ -180,7 +180,7 @@ async def token(
             "client_id": config.descope_inbound_app_client_id,
             "client_secret": config.descope_inbound_app_client_secret,
             "code": code,
-            "redirect_uri": "https://249d6a6783af.ngrok-free.app/api/oauth/callback"  # Your actual ngrok URL
+            "redirect_uri": "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback"  # Your actual ngrok URL
         }
 
         print(f"Token exchange request body: {token_request_body}")
