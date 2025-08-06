@@ -75,9 +75,6 @@ async def authorize(
                     "error_description": 'Only "code" is supported'
                 }
             )
-
-        # Build Descope authorization URL
-        descope_url = "https://api.descope.com/oauth2/v1/apps/authorize"
         
         # Get client ID from environment or use the provided one
         descope_client_id = get_settings().descope_inbound_app_client_id
@@ -340,17 +337,6 @@ def private_scoped(auth_result: str = Security(auth, scopes=['ci:read'])):
     Access to this endpoint requires:
     - A valid access token (authentication), and
     - The presence of the `ci:read` scope in the token.
-    """
-    return auth_result
-
-@app.get("/api/private-scoped/deploy/rollback")
-def private_scoped(auth_result: str = Security(auth, scopes=['deploy:rollback'])):
-    """
-    This is a protected route with scope-based access control.
-
-    Access to this endpoint requires:
-    - A valid access token (authentication), and
-    - The presence of the `deploy:rollback` scope in the token.
     """
     return auth_result
 

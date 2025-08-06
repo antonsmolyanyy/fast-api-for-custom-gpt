@@ -20,7 +20,6 @@ info:
     - `logs:read` - Read access to logs
     - `ci:trigger` - Trigger CI/CD pipelines
     - `ci:read` - Read access to CI/CD data
-    - `deploy:rollback` - Rollback deployments
   version: 1.0.0
   contact:
     name: API Support
@@ -74,9 +73,6 @@ paths:
                       scoped_ci_read:
                         type: string
                         example: "/api/private-scoped/ci/read"
-                      scoped_deploy_rollback:
-                        type: string
-                        example: "/api/private-scoped/deploy/rollback"
                       external_users:
                         type: string
                         example: "/api/external/users"
@@ -476,47 +472,7 @@ paths:
         '403':
           description: Forbidden - missing 'ci:read' scope
 
-  /api/private-scoped/deploy/rollback:
-    get:
-      operationId: getDeployRollbackEndpoint
-      summary: Deploy rollback endpoint
-      description: Protected endpoint that requires 'deploy:rollback' scope
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Success response with user data
-          content:
-            application/json:
-              schema:
-                type: object
-                description: JWT payload from the authenticated user
-                properties:
-                  sub:
-                    type: string
-                    description: Subject identifier from JWT
-                    example: "user123"
-                  email:
-                    type: string
-                    description: User email from JWT
-                    example: "user@example.com"
-                  scope:
-                    type: string
-                    description: Granted scopes from JWT
-                    example: "usage:read logs:read ci:trigger"
-                  iat:
-                    type: integer
-                    description: Token issued at timestamp
-                    example: 1234567890
-                  exp:
-                    type: integer
-                    description: Token expiration timestamp
-                    example: 1234567890
-        '401':
-          description: Unauthorized - invalid or missing token
-        '403':
-          description: Forbidden - missing 'deploy:rollback' scope
-
+  
   /api/external/users:
     get:
       operationId: getExternalUsers
