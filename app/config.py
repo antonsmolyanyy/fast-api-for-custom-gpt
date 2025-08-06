@@ -2,10 +2,10 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    descope_project_id: str = "dummy-project-id"  # Default for deployment
+    descope_project_id: str = "P30sXl6L7lZjl5UT2kYRmgXrWNpl"  # Default for deployment
     descope_api_base_url: str = "https://api.descope.com"  # Default for deployment
-    descope_inbound_app_client_id: str = "dummy-client-id"  # Set via environment variable
-    descope_inbound_app_client_secret: str = "dummy-client-secret"  # Set via environment variable
+    descope_inbound_app_client_id: str = "UDMwc1hsNkw3bFpqbDVVVDJrWVJtZ1hyV05wbDpUUEEzMHN6bllqcVgwaTRrVDdpQnVrV0hiaUV5Q24="  # Set via environment variable
+    descope_inbound_app_client_secret: str = "yyR9H9JpwBloENrsOr1CUkwpI3oggjgidtD8BgOY4sO"  # Set via environment variable
 
     class Config:
         env_file = ".env"
