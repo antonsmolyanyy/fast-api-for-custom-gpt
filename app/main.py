@@ -293,6 +293,9 @@ async def oauth_callback(
     Handles the callback from Descope and redirects back to Custom GPT.
     """
     logger.info(f"OAuth callback received - code: {bool(code)}, state: {state}, error: {error}")
+    logger.info(f"Full callback URL: {request.url}")
+    logger.info(f"Code value: {code[:10] + '...' if code and len(code) > 10 else code}")
+    logger.info(f"State value: {state}")
     
     try:
         # Handle errors from Descope
@@ -324,7 +327,9 @@ async def oauth_callback(
         if state:
             redirect_url += f"&state={state}"
         
-        logger.info(f"Redirecting to Custom GPT: {redirect_url}")
+        logger.info(f"Custom GPT callback URL: {custom_gpt_callback}")
+        logger.info(f"Full redirect URL: {redirect_url}")
+        logger.info(f"Redirect URL length: {len(redirect_url)}")
 
         return RedirectResponse(url=redirect_url)
         
@@ -458,6 +463,31 @@ def test_token_endpoint():
         "message": "Token endpoint is accessible",
         "status": "ok",
         "timestamp": "2024-01-01T00:00:00Z"
+    }
+
+@app.get("/test-oauth-flow")
+async def test_oauth_flow():
+    """Test endpoint to simulate the OAuth flow"""
+    logger.info("Testing OAuth flow simulation")
+    
+    # Step 1: Simulate getting an authorization code
+    auth_url = "https://fast-api-for-custom-gpt.vercel.app/authorize"
+    logger.info(f"Step 1: Authorization URL: {auth_url}")
+    
+    # Step 2: Simulate the callback with a code
+    callback_url = "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback?code=test_code_123&state=test_state"
+    logger.info(f"Step 2: Callback URL: {callback_url}")
+    
+    # Step 3: Simulate token exchange
+    token_url = "https://fast-api-for-custom-gpt.vercel.app/token"
+    logger.info(f"Step 3: Token URL: {token_url}")
+    
+    return {
+        "message": "OAuth flow test",
+        "authorization_url": auth_url,
+        "callback_url": callback_url,
+        "token_url": token_url,
+        "note": "Check logs for detailed flow information"
     }
 
 @app.get("/debug/env")
