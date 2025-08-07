@@ -3,14 +3,9 @@ from fastapi.responses import RedirectResponse
 from app.auth import TokenVerifier
 import httpx
 import json
-import logging
 from typing import Optional
 from app.config import get_settings
 import urllib.request
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # We use PyJWKClient, which internally uses Python's built-in urllib.request, which sends requests
 # without a standard User-Agent header (e.g., it sends "Python-urllib/3.x").
@@ -26,15 +21,15 @@ auth = TokenVerifier()
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Log all incoming requests for debugging"""
-    logger.info(f"INCOMING REQUEST: {request.method} {request.url.path} - Headers: {dict(request.headers)}")
+    print(f"INCOMING REQUEST: {request.method} {request.url.path} - Headers: {dict(request.headers)}")
     response = await call_next(request)
-    logger.info(f"RESPONSE: {request.method} {request.url.path} - Status: {response.status_code}")
+    print(f"RESPONSE: {request.method} {request.url.path} - Status: {response.status_code}")
     return response
 
 @app.get("/")
 def root():
     """Root endpoint - API information"""
-    logger.info("Root endpoint accessed")
+    print("Root endpoint accessed")
     return {
         "message": "FastAPI Sample App with Descope Authentication",
         "version": "1.0.0",
@@ -70,12 +65,12 @@ async def authorize(
     
     This endpoint forwards OAuth authorization requests to Descope's Inbound Apps.
     """
-    logger.info(f"Authorization request received - response_type: {response_type}, scope: {scope}, state: {state}")
+    print(f"Authorization request received - response_type: {response_type}, scope: {scope}, state: {state}")
     
     try:
         # Validate required parameters
         if not redirect_uri or not response_type:
-            logger.error(f"Missing required parameters - redirect_uri: {bool(redirect_uri)}, response_type: {bool(response_type)}")
+            print(f"Missing required parameters - redirect_uri: {bool(redirect_uri)}, response_type: {bool(response_type)}")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -86,7 +81,7 @@ async def authorize(
 
         # Validate response_type
         if response_type != "code":
-            logger.error(f"Unsupported response_type: {response_type}")
+            print(f"Unsupported response_type: {response_type}")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -98,11 +93,11 @@ async def authorize(
         # Get client ID from environment or use the provided one
         descope_client_id = get_settings().descope_inbound_app_client_id
         
-        logger.info(f"Client ID available: {bool(descope_client_id)}")
-        logger.info(f"Client ID length: {len(descope_client_id) if descope_client_id else 0}")
+        print(f"Client ID available: {bool(descope_client_id)}")
+        print(f"Client ID length: {len(descope_client_id) if descope_client_id else 0}")
         
         if not descope_client_id:
-            logger.error("OAuth client credentials not configured")
+            print("OAuth client credentials not configured")
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -115,8 +110,8 @@ async def authorize(
         base_url = str(request.base_url).rstrip('/')
         callback_url = f"{base_url}/api/oauth/callback"
         
-        logger.info(f"Base URL: {base_url}")
-        logger.info(f"Callback URL: {callback_url}")
+        print(f"Base URL: {base_url}")
+        print(f"Callback URL: {callback_url}")
         
         # Construct query parameters
         params = {
@@ -131,7 +126,7 @@ async def authorize(
         query_string = "&".join([f"{k}={v}" for k, v in params.items()])
         full_url = f"https://api.descope.com/oauth2/v1/apps/authorize?{query_string}"
         
-        logger.info(f"Redirecting to Descope: {full_url}")
+        print(f"Redirecting to Descope: {full_url}")
         
         # Redirect to Descope's authorization endpoint
         return RedirectResponse(url=full_url)
@@ -139,7 +134,7 @@ async def authorize(
     except HTTPException:
         raise
     except Exception as error:
-        logger.error(f"Authorization endpoint error: {error}")
+        print(f"Authorization endpoint error: {error}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -157,12 +152,12 @@ async def token(
     
     This endpoint forwards token exchange requests to Descope's Inbound Apps.
     """
-    logger.info("Token exchange request received")
+    print("Token exchange request received")
     
     try:
         # Parse the request body based on content type
         content_type = request.headers.get("content-type", "")
-        logger.info(f"Request content-type: {content_type}")
+        print(f"Request content-type: {content_type}")
         
         if "application/json" in content_type:
             body = await request.json()
@@ -177,23 +172,23 @@ async def token(
                 form_data = await request.form()
                 body = dict(form_data)
         
-        logger.info(f"Request body: {body}")
+        print(f"Request body: {body}")
         
         grant_type = body.get("grant_type")
         code = body.get("code")
         client_id = config.descope_inbound_app_client_id
         client_secret = config.descope_inbound_app_client_secret
 
-        logger.info(f"Grant type: {grant_type}")
-        logger.info(f"Code available: {bool(code)}")
-        logger.info(f"Client ID available: {bool(client_id)}")
-        logger.info(f"Client secret available: {bool(client_secret)}")
-        logger.info(f"Client ID length: {len(client_id) if client_id else 0}")
-        logger.info(f"Client secret length: {len(client_secret) if client_secret else 0}")
+        print(f"Grant type: {grant_type}")
+        print(f"Code available: {bool(code)}")
+        print(f"Client ID available: {bool(client_id)}")
+        print(f"Client secret available: {bool(client_secret)}")
+        print(f"Client ID length: {len(client_id) if client_id else 0}")
+        print(f"Client secret length: {len(client_secret) if client_secret else 0}")
 
         # Validate required parameters
         if not grant_type or not code or not client_id or not client_secret:
-            logger.error(f"Missing required parameters - grant_type: {bool(grant_type)}, code: {bool(code)}, client_id: {bool(client_id)}, client_secret: {bool(client_secret)}")
+            print(f"Missing required parameters - grant_type: {bool(grant_type)}, code: {bool(code)}, client_id: {bool(client_id)}, client_secret: {bool(client_secret)}")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -204,7 +199,7 @@ async def token(
 
         # Only support authorization_code grant type
         if grant_type != "authorization_code":
-            logger.error(f"Unsupported grant_type: {grant_type}")
+            print(f"Unsupported grant_type: {grant_type}")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -215,9 +210,9 @@ async def token(
 
         # Check if we have the required environment variables
         if not config.descope_inbound_app_client_id or not config.descope_inbound_app_client_secret:
-            logger.error("Missing environment variables for token exchange")
-            logger.error(f"CLIENT_ID: {bool(config.descope_inbound_app_client_id)}")
-            logger.error(f"CLIENT_SECRET: {bool(config.descope_inbound_app_client_secret)}")
+            print("Missing environment variables for token exchange")
+            print(f"CLIENT_ID: {bool(config.descope_inbound_app_client_id)}")
+            print(f"CLIENT_SECRET: {bool(config.descope_inbound_app_client_secret)}")
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -230,8 +225,8 @@ async def token(
         base_url = str(request.base_url).rstrip('/')
         callback_url = f"{base_url}/api/oauth/callback"
 
-        logger.info(f"Base URL: {base_url}")
-        logger.info(f"Callback URL: {callback_url}")
+        print(f"Base URL: {base_url}")
+        print(f"Callback URL: {callback_url}")
 
         # Forward the request to Descope's token endpoint
         token_request_body = {
@@ -242,13 +237,13 @@ async def token(
             "redirect_uri": callback_url
         }
 
-        logger.info(f"Token exchange request body: {token_request_body}")
-        logger.info(f"Token exchange URL: https://api.descope.com/oauth2/v1/apps/token")
+        print(f"Token exchange request body: {token_request_body}")
+        print(f"Token exchange URL: https://api.descope.com/oauth2/v1/apps/token")
 
         descope_url = "https://api.descope.com/oauth2/v1/apps/token"
         
         async with httpx.AsyncClient() as client:
-            logger.info("Sending request to Descope token endpoint")
+            print("Sending request to Descope token endpoint")
             response = await client.post(
                 descope_url,
                 data=token_request_body,
@@ -258,12 +253,12 @@ async def token(
             descope_data = response.json()
             
             # Log the response for debugging
-            logger.info(f"Descope token response status: {response.status_code}")
-            logger.info(f"Descope token response data: {descope_data}")
+            print(f"Descope token response status: {response.status_code}")
+            print(f"Descope token response data: {descope_data}")
 
             # If Descope returned an error, log it
             if response.status_code >= 400:
-                logger.error(f"Descope token exchange failed: {descope_data}")
+                print(f"Descope token exchange failed: {descope_data}")
 
             # Return the response from Descope
             return descope_data
@@ -271,7 +266,7 @@ async def token(
     except HTTPException:
         raise
     except Exception as error:
-        logger.error(f"Token endpoint error: {error}")
+        print(f"Token endpoint error: {error}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -293,16 +288,16 @@ async def oauth_callback(
     
     Handles the callback from Descope and redirects back to Custom GPT.
     """
-    logger.info(f"OAuth callback received - code: {bool(code)}, state: {state}, error: {error}")
-    logger.info(f"Full callback URL: {request.url}")
-    logger.info(f"Code value: {code}")
-    logger.info(f"State value: {state}")
-    logger.info(f"All query params: {dict(request.query_params)}")
+    print(f"OAuth callback received - code: {bool(code)}, state: {state}, error: {error}")
+    print(f"Full callback URL: {request.url}")
+    print(f"Code value: {code}")
+    print(f"State value: {state}")
+    print(f"All query params: {dict(request.query_params)}")
     
     try:
         # Handle errors from Descope
         if error:
-            logger.error(f"Descope authorization error: {error}, {error_description}")
+            print(f"Descope authorization error: {error}, {error_description}")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -312,8 +307,8 @@ async def oauth_callback(
             )
 
         if not code:
-            logger.error("No authorization code received")
-            logger.error(f"All query parameters: {dict(request.query_params)}")
+            print("No authorization code received")
+            print(f"All query parameters: {dict(request.query_params)}")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -330,16 +325,16 @@ async def oauth_callback(
         if state:
             redirect_url += f"&state={state}"
         
-        logger.info(f"Custom GPT callback URL: {custom_gpt_callback}")
-        logger.info(f"Full redirect URL: {redirect_url}")
-        logger.info(f"Redirect URL length: {len(redirect_url)}")
+        print(f"Custom GPT callback URL: {custom_gpt_callback}")
+        print(f"Full redirect URL: {redirect_url}")
+        print(f"Redirect URL length: {len(redirect_url)}")
 
         return RedirectResponse(url=redirect_url)
         
     except HTTPException:
         raise
     except Exception as error:
-        logger.error(f"Callback endpoint error: {error}")
+        print(f"Callback endpoint error: {error}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -461,7 +456,7 @@ async def call_custom_api(endpoint: str, auth_result: str = Security(auth)):
 @app.get("/test-token-endpoint")
 def test_token_endpoint():
     """Test endpoint to verify token endpoint is accessible"""
-    logger.info("Test token endpoint accessed")
+    print("Test token endpoint accessed")
     return {
         "message": "Token endpoint is accessible",
         "status": "ok",
@@ -471,19 +466,19 @@ def test_token_endpoint():
 @app.get("/test-oauth-flow")
 async def test_oauth_flow():
     """Test endpoint to simulate the OAuth flow"""
-    logger.info("Testing OAuth flow simulation")
+    print("Testing OAuth flow simulation")
     
     # Step 1: Simulate getting an authorization code
     auth_url = "https://fast-api-for-custom-gpt.vercel.app/authorize"
-    logger.info(f"Step 1: Authorization URL: {auth_url}")
+    print(f"Step 1: Authorization URL: {auth_url}")
     
     # Step 2: Simulate the callback with a code
     callback_url = "https://fast-api-for-custom-gpt.vercel.app/api/oauth/callback?code=test_code_123&state=test_state"
-    logger.info(f"Step 2: Callback URL: {callback_url}")
+    print(f"Step 2: Callback URL: {callback_url}")
     
     # Step 3: Simulate token exchange
     token_url = "https://fast-api-for-custom-gpt.vercel.app/token"
-    logger.info(f"Step 3: Token URL: {token_url}")
+    print(f"Step 3: Token URL: {token_url}")
     
     return {
         "message": "OAuth flow test",
@@ -496,7 +491,7 @@ async def test_oauth_flow():
 @app.get("/debug/env")
 def debug_env():
     """Debug endpoint to check environment variables"""
-    logger.info("Debug environment endpoint accessed")
+    print("Debug environment endpoint accessed")
     
     env_vars = {
         "DESCOPE_INBOUND_APP_CLIENT_ID": bool(config.descope_inbound_app_client_id),
@@ -506,7 +501,7 @@ def debug_env():
         "CLIENT_SECRET_LENGTH": len(config.descope_inbound_app_client_secret) if config.descope_inbound_app_client_secret else 0,
     }
     
-    logger.info(f"Environment variables status: {env_vars}")
+    print(f"Environment variables status: {env_vars}")
     
     return {
         "message": "Environment variables debug info",
