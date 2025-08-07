@@ -295,8 +295,9 @@ async def oauth_callback(
     """
     logger.info(f"OAuth callback received - code: {bool(code)}, state: {state}, error: {error}")
     logger.info(f"Full callback URL: {request.url}")
-    logger.info(f"Code value: {code[:10] + '...' if code and len(code) > 10 else code}")
+    logger.info(f"Code value: {code}")
     logger.info(f"State value: {state}")
+    logger.info(f"All query params: {dict(request.query_params)}")
     
     try:
         # Handle errors from Descope
@@ -312,6 +313,7 @@ async def oauth_callback(
 
         if not code:
             logger.error("No authorization code received")
+            logger.error(f"All query parameters: {dict(request.query_params)}")
             raise HTTPException(
                 status_code=400,
                 detail={
