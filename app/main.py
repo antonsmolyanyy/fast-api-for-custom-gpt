@@ -282,6 +282,7 @@ async def token(
 
 @app.get("/api/oauth/callback")
 async def oauth_callback(
+    request: Request,
     code: Optional[str] = None,
     state: Optional[str] = None,
     error: Optional[str] = None,
