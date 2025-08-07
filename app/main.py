@@ -23,6 +23,14 @@ config = get_settings()
 app = FastAPI()
 auth = TokenVerifier()
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests for debugging"""
+    logger.info(f"INCOMING REQUEST: {request.method} {request.url.path} - Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    logger.info(f"RESPONSE: {request.method} {request.url.path} - Status: {response.status_code}")
+    return response
+
 @app.get("/")
 def root():
     """Root endpoint - API information"""
@@ -441,6 +449,16 @@ async def call_custom_api(endpoint: str, auth_result: str = Security(auth)):
             "data": response.json(),
             "source": f"Custom API: {base_url}"
         }
+
+@app.get("/test-token-endpoint")
+def test_token_endpoint():
+    """Test endpoint to verify token endpoint is accessible"""
+    logger.info("Test token endpoint accessed")
+    return {
+        "message": "Token endpoint is accessible",
+        "status": "ok",
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
 
 @app.get("/debug/env")
 def debug_env():
