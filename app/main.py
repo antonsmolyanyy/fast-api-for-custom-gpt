@@ -318,7 +318,7 @@ async def oauth_callback(
             )
 
         # Custom GPT callback URL
-        custom_gpt_callback = "https://chat.openai.com/aip/g-e3b7f2f4c25562eb30538a4f1aa74846326222f6/oauth/callback"
+        custom_gpt_callback = "https://chat.openai.com/aip/g-52cb1e9d28639354d827969f698f2b8948133aa7/oauth/callback"
         
         # Build redirect URL back to Custom GPT
         redirect_url = f"{custom_gpt_callback}?code={code}"
