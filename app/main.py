@@ -136,11 +136,8 @@ async def authorize(
     except Exception as error:
         print(f"Authorization endpoint error: {error}")
         raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "server_error",
-                "error_description": f"Internal server error + {descope_client_id}"
-            }
+            status_code=500
+            
         )
 
 @app.post("/token")
@@ -209,10 +206,10 @@ async def token(
             )
 
         # Check if we have the required environment variables
-        if not config.descope_inbound_app_client_id or not config.descope_inbound_app_client_secret:
+        if len(client_id) == 0 or len(client_secret) == 0:
             print("Missing environment variables for token exchange")
-            print(f"CLIENT_ID: {bool(config.descope_inbound_app_client_id)}")
-            print(f"CLIENT_SECRET: {bool(config.descope_inbound_app_client_secret)}")
+            print(f"CLIENT_ID: {bool(client_id)}")
+            print(f"CLIENT_SECRET: {bool(client_secret)}")
             raise HTTPException(
                 status_code=500,
                 detail={

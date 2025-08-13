@@ -1,19 +1,18 @@
 from typing import Optional, List
-
+import os
 import jwt
 from jwt import PyJWKClient
 from fastapi import Depends
 from fastapi.security import SecurityScopes, HTTPAuthorizationCredentials, HTTPBearer
 
-from app.config import get_settings
 from app.exceptions import UnauthenticatedException, UnauthorizedException
 
+jwks_url = f"https://api.descope.com/{os.getenv('DESCOPE_PROJECT_ID')}/.well-known/jwks.json"
 
 class TokenVerifier:
     def __init__(self):
-        self.config = get_settings()
         try:
-            self.jwks_client = PyJWKClient(self.config.jwks_url)
+            self.jwks_client = PyJWKClient(jwks_url)
         except Exception:
             # Fallback for deployment scenarios
             self.jwks_client = None
@@ -45,7 +44,6 @@ class TokenVerifier:
                 return {
                     "user_id": "mock-user-id",
                     "email": "mock@example.com",
-                    "scope": "read:messages write:messages delete:messages",
                     "note": "Mock response for deployment testing"
                 }
             else:
@@ -62,12 +60,17 @@ class TokenVerifier:
 
     def _decode_token(self, token: str, key):
         try:
+            project_id = os.getenv("DESCOPE_PROJECT_ID")
+            issuer_candidates = [
+                f'https://api.descope.com/v1/apps/{project_id}', 
+                project_id
+            ]
             return jwt.decode(
                 token,
                 key,
                 algorithms=self.allowed_algorithms,
-                issuer=self.config.issuer_candidates,
-                audience=self.config.audience
+                issuer=issuer_candidates,
+                audience=project_id
             )
         except Exception as e:
             raise UnauthorizedException(f"Token decoding failed: {str(e)}")
