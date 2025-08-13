@@ -4,8 +4,8 @@ from app.auth import TokenVerifier
 import httpx
 import json
 from typing import Optional
-from app.config import get_settings
 import urllib.request
+import os
 
 # We use PyJWKClient, which internally uses Python's built-in urllib.request, which sends requests
 # without a standard User-Agent header (e.g., it sends "Python-urllib/3.x").
@@ -13,7 +13,6 @@ import urllib.request
 opener = urllib.request.build_opener()
 opener.addheaders = [('User-agent', 'Mozilla/5.0 (DescopeFastAPISampleApp)')]
 urllib.request.install_opener(opener)
-config = get_settings()
 
 app = FastAPI()
 auth = TokenVerifier()
@@ -91,7 +90,7 @@ async def authorize(
             )
         
         # Get client ID from environment or use the provided one
-        descope_client_id = get_settings().descope_inbound_app_client_id
+        descope_client_id = os.getenv('DESCOPE_INBOUND_APP_CLIENT_ID')
         
         print(f"Client ID available: {bool(descope_client_id)}")
         print(f"Client ID length: {len(descope_client_id) if descope_client_id else 0}")
@@ -173,8 +172,8 @@ async def token(
         
         grant_type = body.get("grant_type")
         code = body.get("code")
-        client_id = config.descope_inbound_app_client_id
-        client_secret = config.descope_inbound_app_client_secret
+        client_id = os.getenv('DESCOPE_INBOUND_APP_CLIENT_ID')
+        client_secret = os.getenv('DESCOPE_INBOUND_APP_CLIENT_SECRET')
 
         print(f"Grant type: {grant_type}")
         print(f"Code available: {bool(code)}")
@@ -228,8 +227,8 @@ async def token(
         # Forward the request to Descope's token endpoint
         token_request_body = {
             "grant_type": "authorization_code",
-            "client_id": config.descope_inbound_app_client_id,
-            "client_secret": config.descope_inbound_app_client_secret,
+            "client_id": os.getenv('DESCOPE_INBOUND_APP_CLIENT_ID'),
+            "client_secret": os.getenv('DESCOPE_INBOUND_APP_CLIENT_SECRET'),
             "code": code,
             "redirect_uri": callback_url
         }
@@ -491,11 +490,11 @@ def debug_env():
     print("Debug environment endpoint accessed")
     
     env_vars = {
-        "DESCOPE_INBOUND_APP_CLIENT_ID": bool(config.descope_inbound_app_client_id),
-        "DESCOPE_INBOUND_APP_CLIENT_SECRET": bool(config.descope_inbound_app_client_secret),
-        "DESCOPE_PROJECT_ID": config.descope_project_id,
-        "CLIENT_ID_LENGTH": len(config.descope_inbound_app_client_id) if config.descope_inbound_app_client_id else 0,
-        "CLIENT_SECRET_LENGTH": len(config.descope_inbound_app_client_secret) if config.descope_inbound_app_client_secret else 0,
+        "DESCOPE_INBOUND_APP_CLIENT_ID": bool(os.getenv('DESCOPE_INBOUND_APP_CLIENT_ID')),
+        "DESCOPE_INBOUND_APP_CLIENT_SECRET": bool(os.getenv('DESCOPE_INBOUND_APP_CLIENT_SECRET')),
+        "DESCOPE_PROJECT_ID": os.getenv('DESCOPE_PROJECT_ID'),
+        "CLIENT_ID_LENGTH": len(os.getenv('DESCOPE_INBOUND_APP_CLIENT_ID')) if os.getenv('DESCOPE_INBOUND_APP_CLIENT_ID') else 0,
+        "CLIENT_SECRET_LENGTH": len(os.getenv('DESCOPE_INBOUND_APP_CLIENT_SECRET')) if os.getenv('DESCOPE_INBOUND_APP_CLIENT_SECRET') else 0,
     }
     
     print(f"Environment variables status: {env_vars}")
